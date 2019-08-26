@@ -1,0 +1,240 @@
+<!-- Bootstrap -->
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<style>
+    .text-black {
+        color: #000000;
+    }
+    .text-black-shade-1 {
+        color: #666;
+    }
+    .text-black-shade-2 {
+        color: #888;
+    }
+    .text-link-color {
+        color: #337ab7;
+    }
+
+    .bg-black {
+        background-color: black;
+    }
+    .poll-bar {
+        position: relative;
+    }
+    .poll-bar__fill {
+        background-color: rgba(126, 183, 247, 0.6);
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+</style>
+<div id="js-container">
+</div>
+<!-- React -->
+<script crossorigin src="https://unpkg.com/react@16/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone@7.5.5/babel.min.js"></script>
+<!-- PropTypes -->
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.7.2/prop-types.js"></script>
+<!-- Lodash -->
+<script crossorigin src="https://cdn.jsdelivr.net/npm/lodash@4.17.15/lodash.min.js"></script>
+<script type="text/babel">
+    const SUBMIT_END_POINT = "http://192.168.0.128/api/submit";
+
+    const container = document.getElementById("js-container");
+
+    // Clickable bar element
+    class PollBar extends React.Component {
+        render() {
+            const {
+                name,
+                isSelected,
+                isSubmitted,
+                percentage,
+                onSelect
+            } = this.props;
+            return (
+                <button className="btn btn-block btn-white border text-left py-2 poll-bar" onClick={onSelect} disabled={isSubmitted}>
+                    <div className="row d-flex align-items-center">
+                        <div className={"col-auto mr-2" + (isSelected ? " font-weight-bold" : "")}>{name}</div>
+                        <div className={"col-auto" + (!!isSelected ? " d-block" : " d-none")}>
+                            <img src="tick.png" alt="tick" style={{
+                                height: "24px",
+                                width: "24px"
+                            }}/>
+                        </div>
+                        <div className="col text-right">
+                            { isSubmitted && (percentage + "%") }
+                        </div>
+                    </div>
+                    <div className="poll-bar__fill" style={{
+                        width: percentage + "%"
+                    }}>
+
+                    </div>
+                </button>
+            );
+        }
+    }
+
+    PollBar.propTypes = {
+        name: PropTypes.string.isRequired,
+        isSelected: PropTypes.boolean,
+        isSubmitted: PropTypes.boolean,
+        percentage: PropTypes.number,
+        onSelect: PropTypes.func
+    };
+
+    class PollApp extends React.Component {
+        state = {
+            inAjax: false,
+            options: [
+                "Google Pixel (e.g. 3, 3XL)",
+                "Apple iPhone (e.g. 8, X, XS)",
+                "Samsung Galaxy (e.g. S9, S9+)",
+                "Huawai (e.g. P20 Pro, 20 Mate)",
+                "None of the above"
+            ],
+            selections: Array.from(Array(5), () => false),
+            // Result will only be shown if true
+            isSubmitted: false,
+            // {
+            //      <label_1>: <count_1>,
+            //      <label_2>: <count_2>.
+            //      ...
+            // }
+            pollResult: {},
+        };
+
+        handleSelect(index) {
+            const copy = [...this.state.selections];
+            copy[index] = !copy[index];
+            this.setState({
+                selections: copy
+            })
+        }
+
+        async ajaxPostResult() {
+            const data = _.reduce(this.state.selections, (collector, value, key) => {
+                // Push the index key into collector if value is truthy
+                // Since label is 1-index based, offset by one
+                // [true, false, true, false, false] => [1, 3]
+                if (!!value) {
+                    collector.push(key + 1)
+                }
+                return collector;
+            }, []);
+            if (data.length === 0) {
+                alert("“Please select at least one option.”");
+            } else {
+                const res =  await fetch(SUBMIT_END_POINT, {
+                    method: "POST",
+                    body: JSON.stringify(data)
+                });
+                return await res.json();
+            }
+        }
+
+        async handleSubmit() {
+            this.setState({
+                inAjax: true
+            });
+            const pollResult = await this.ajaxPostResult();
+            this.setState({
+                isSubmitted: true,
+                inAjax: false,
+                pollResult: pollResult
+            });
+        }
+
+        renderContent() {
+            const {
+                options,
+                selections,
+                isSubmitted,
+                pollResult
+            } = this.state;
+            if (!isSubmitted) {
+                return (
+                    options.map((option, index) => (
+                        <PollBar
+                            name={option}
+                            isSelected={selections[index]}
+                            isSubmitted={isSubmitted}
+                            onSelect={() => {
+                                this.handleSelect(index);
+                            }}
+                        />
+                    ))
+                );
+            } else {
+                const sum = _.sum(_.values(pollResult));
+                return (
+                    options.map((option, index) => {
+                        // Poll result is 1-indexed. Offset by 1
+                        const count = pollResult[index + 1];
+                        return (
+                            <PollBar
+                                name={option}
+                                isSelected={selections[index]}
+                                isSubmitted={isSubmitted}
+                                percentage={isNaN(sum) ? 0 : Math.round(count / sum * 100)}
+                            />
+                        );
+                    })
+                );
+            }
+        }
+
+        render() {
+            return (
+                <div className="container">
+                    <div className="row">
+                        <div className="col">
+                            <div className="my-3">
+                                <span className="font-weight-bold">This is a Google sponsored poll.</span> Your answer will be part of a Google brand study on smartphone consumers.
+                            </div>
+                            <h4 className="mb-4 font-weight-bold">
+                                Which of these phones have you heard of? (Select all that apply)
+                            </h4 >
+                            {
+                                this.renderContent()
+                            }
+                            <div className="my-3">
+                                <small className="text-black-shade-1">
+                                    By submitting your vote, you consent to participate in the poll and consent
+                                    to the use of your answers by Google for the sole purpose of their brand
+                                    study. Click <a className="text-link-color" href="https://hypebeast.com/privacy">here</a> to learn about our Privacy Policy.
+                                </small>
+                            </div>
+                            <div className="text-right my-3">
+                                <button className="btn btn-dark btn-block bg-black" onClick={this.handleSubmit.bind(this)} disabled={this.state.inAjax || this.state.isSubmitted}>
+                                    {
+                                        this.state.inAjax ? (
+                                            <div className="spinner-border text-light spinner-border-sm" role="status">
+                                                <span className="sr-only">Loading...</span>
+                                            </div>
+                                        ): "Submit Vote"}
+                                </button>
+                            </div>
+                            <div className="text-right text-black-shade-2">
+                                Advertisement
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )
+        }
+    }
+
+    ReactDOM.render(
+        <PollApp/>
+    , container);
+
+    const iframe = window.parent.document.getElementsByTagName('iframe')[0];
+
+    iframe.setAttribute("width", "100%");
+    iframe.setAttribute("height", "500px");
+
+
+</script>
