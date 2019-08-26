@@ -8,7 +8,7 @@ This project is built for hype-beast code challenge.
 
 Deploy to web server, or use
 
-`php -S localhost:4080 -t C:\Users\ypoon\Code\php\interview\hypebeast\client`
+`php -S localhost:4080 -t /path/to/folder`
 
 ## API Config
 
