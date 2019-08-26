@@ -4,7 +4,7 @@ This project is built for hype-beast code challenge.
 
 - PHP
 
-## Start ()
+## Start
 
 Deploy to web server, or use
 
